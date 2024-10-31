@@ -3,13 +3,19 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Project, Account, Organization
+from .models import Project, Account, Organization, Issue
 
 
 class ProjectSerializer(ModelSerializer):
+    organizations_names = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
         fields = '__all__'
+    
+    def get_organizations_names(self, obj):
+        # Assuming 'participants' is a ManyToManyField or a related field
+        return [org.name for org in obj.organizations.all()]
 
 
 class AccountSerializer(ModelSerializer):
@@ -23,6 +29,11 @@ class OrganizationSerializer(ModelSerializer):
         model = Organization
         fields = '__all__'
 
+
+class IssueSerializer(ModelSerializer):
+    class Meta:
+        model = Issue
+        fields = '__all__'
 
 # class ConversationSerializer(serializers.ModelSerializer):
 #     participants_usernames = serializers.SerializerMethodField()

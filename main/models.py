@@ -30,3 +30,18 @@ class Project(models.Model):
     
     class Meta:
         ordering = ['-date_created']
+
+
+class Issue(models.Model):
+    issue = models.CharField(max_length=255)
+    description = models.TextField()
+    project = models.ForeignKey(Project,on_delete=models.CASCADE)
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
+    attendants = models.ManyToManyField(Account,blank=True)
+
+    def __str__(self):
+        return self.issue
+    
+    class Meta:
+        ordering = ['-date_created']
