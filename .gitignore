@@ -82,3 +82,7 @@ projektiq/main/migrations/__pycache__
 main/migrations/__pycache__
 
 projektiq/main/migrations/__pycache__
+
+
+# batch files
+*.bat
