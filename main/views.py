@@ -4,10 +4,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation
-from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer
+from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage
+from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer
 from django.utils.timezone import now, timedelta
 from django.db.models import Q, Count
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import JSONParser
+from django.shortcuts import get_object_or_404
 
 import logging
 
@@ -17,21 +21,37 @@ next_seven_days = now() + timedelta(days=7)
 
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
-def projects(request,id):
-    try:
-        organization = Organization.objects.get(id=id)
-    except Organization.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+def projects(request):
     if request.method == "GET":
-        projects = Project.objects.filter(organizations=organization)
+        projects = Project.objects.all()
         serializer = ProjectSerializer(projects,many=True)
         return Response(serializer.data)
     elif request.method == "POST":
-        serializer = ProjectSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        data = request.data.copy()
+        print('Data : ', data)
+        manager_id = data.get('manager')
+        if manager_id:
+            try:
+                manager = Account.objects.get(username=manager_id)
+                data['manager'] = manager.id
+                data['organizations'] = data['participantOrganizations']
+            except Account.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid manager ID'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
+        serializer = ProjectSerializer(data=data)
+        if serializer.is_valid():
+            project = serializer.save()
+            AccountProject.objects.get_or_create(
+                account=manager, 
+                project=project,
+                role='General Manager'
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
 def organizations(request):
@@ -429,11 +449,11 @@ def search(request):
 
         results = []
         for project in projects:
-            results.append({'type': 'Project', 'name': project.name})
+            results.append({'type': 'Project', 'name': project.name, 'id': project.id})
         for issue in issues:
-            results.append({'type': 'Issue', 'title': issue.issue})
+            results.append({'type': 'Issue', 'title': issue.issue,  'id': issue.id})
         for change_request in change_requests:
-            results.append({'type': 'Change Request', 'title': change_request.request})  # Update if needed.
+            results.append({'type': 'Change Request', 'title': change_request.request, 'id' : change_request.id})  # Update if needed.
         for organization in organizations:
             results.append({'type': 'Organization', 'name': organization.name})
 
@@ -500,14 +520,79 @@ def my_conversations(request):
     if request.method == 'GET':
         logger.info(f"Fetching conversations for account {account.id}")
         conversations = Conversation.objects.filter(participants=account)
-        serializer = ConversationSerializer(conversations, many=True)
+        serializer = ConversationSerializer(conversations, many=True, context={'request': request})
+
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        logger.info(f"Creating a new conversation for account {account.id}")
+        
         serializer = ConversationSerializer(data=request.data)
         if serializer.is_valid():
             conversation = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         logger.error(f"Conversation creation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def send_message(request):
+    try:
+        account = Account.objects.get(id=request.user.id)
+    except Account.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'POST':
+        data =  {
+            "conversation" : request.data.get('chat'),
+            "sent_by" : account.id,
+            "message" : request.data.get('message')
+        }
+        serializer = ConversationMessageSerializer(data=data)
+        if serializer.is_valid():
+            message = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Message creation failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PATCH'])  # Adding 'GET' for possible testing/debugging
+@permission_classes([IsAuthenticated])
+def mark_messages_as_read(request,id):
+    try:
+        account = Account.objects.get(id=request.user.id)
+    except Account.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        messages = Message.objects.filter(account=account)
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'PATCH':
+        if id:
+            try:
+                message = ConversationMessage.objects.get(id=id)
+            except ConversationMessage.DoesNotExist:
+                return Response({"error": "Message not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            data = request.data
+            is_read = data.get('is_read', None)
+
+            if is_read is None:
+                return Response({"error": "'is_read' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            message.is_read = is_read
+            message.save()
+            serializer = ConversationMessageSerializer(message)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        else:
+            data = request.data
+            message_ids = data.get('message_ids', [])
+            if not message_ids:
+                return Response({"error": "'message_ids' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            updated_count = Message.objects.filter(id__in=message_ids, account=account).update(is_read=True)
+            return Response(
+                {"message": f"{updated_count} messages marked as read."},
+                status=status.HTTP_200_OK,
+            )

@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 
 urlpatterns = [
-    path('projects/<int:id>', views.projects,name='projects'),
+    path('projects/', views.projects,name='projects'),
     path('project/<int:id>', views.project,name='project'),
 
     path('organizations/', views.organizations,name='organizations'),
@@ -32,10 +32,13 @@ urlpatterns = [
     path('my_schedule/',views.my_schedule,name="my_schedule"),
     path('my_conversations/',views.my_conversations,name="my_conversations"),
     path('user_project_summary/',views.user_project_summary,name="user_project_summary"),
+    path('send_message/',views.send_message,name="send_message"),
 
     path('test/',views.check_authentication,name='test'),
 
     path('search/',views.search,name='search'),
+
+    path('messages/<int:id>/',views.mark_messages_as_read,name='message'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)

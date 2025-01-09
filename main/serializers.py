@@ -71,14 +71,18 @@ class ProjectSerializer(serializers.ModelSerializer):
     issues = IssueSerializer(many=True, read_only=True, source='issue_set')
     requirements = ProjectRequirementSerializer(many=True, read_only=True, source="projectrequirement_set")
     change_requests = ChangeRequestSerializer(many=True, read_only=True, source="changerequest_set")
+    project_manager = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ['id', 'name', 'description', 'date_created', 'date_updated', 
-                  'manager', 'status', 'organization_names', 'issues','requirements','change_requests']
+                  'manager', 'status', 'organization_names', 'issues','requirements','change_requests','project_manager','deadline','stage_due_date','organizations','completion_percentage']
 
     def get_organization_names(self, obj):
         return [org.name for org in obj.organizations.all()]
+
+    def get_project_manager(self, obj):
+        return obj.manager.username
 
 
 class AccountSerializer(ModelSerializer):
@@ -210,9 +214,9 @@ class ToDoSerializer(serializers.ModelSerializer):
         return None
 
 
-
-
 class ConversationMessageSerializer(serializers.ModelSerializer):
+    sent_by_username = serializers.SerializerMethodField()
+
     class Meta:
         model = ConversationMessage
         fields = [
@@ -221,8 +225,13 @@ class ConversationMessageSerializer(serializers.ModelSerializer):
             'sent_by',
             'message',
             'date_created',
-            'date_updated'
+            'date_updated',
+            'sent_by_username',
+            'is_read'
         ]
+    
+    def get_sent_by_username(self, obj):
+        return obj.sent_by.username
 
 
 class ConversationAttachmentSerializer(serializers.ModelSerializer):
@@ -263,4 +272,7 @@ class ConversationSerializer(serializers.ModelSerializer):
         return [user.username for user in obj.participants.all()]
 
     def get_unread_messages(self, obj):
-        return obj.messages.filter(is_read=False).count()
+        current_user = self.context['request'].user.id
+        unread_messages = obj.messages.filter(is_read=False).exclude(sent_by=current_user)
+        return unread_messages.count()
+

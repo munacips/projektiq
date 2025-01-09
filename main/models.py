@@ -62,7 +62,7 @@ class Project(models.Model):
     organizations = models.ManyToManyField(Organization, blank=True)
     status = models.CharField(max_length=100, choices=STATUS_CHOICES, default='Requirements')
     deadline = models.DateTimeField(null=True, blank=True)
-    completion_percentage = models.IntegerField(null=True, blank=True)
+    completion_percentage = models.IntegerField(null=True, blank=True,default=0)
     stage_due_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
