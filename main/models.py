@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
+from django.core.exceptions import ValidationError
+from django.db import models
 
 
 STATUS_CHOICES = [
@@ -84,7 +86,7 @@ class Project(models.Model):
 
 
 class ProjectTask(models.Model):
-    project = models.ForeignKey(Project,on_delete=models.CASCADE)
+    project = models.ForeignKey(Project,on_delete=models.CASCADE,null=True,blank=True)
     task = models.CharField(max_length=255)
     description = models.TextField()
     date_created = models.DateTimeField(auto_now_add=True)
@@ -137,7 +139,6 @@ class Issue(models.Model):
         ordering = ['-date_created']
 
 
-
 class ProjectRequirement(models.Model):
     project = models.ForeignKey(Project,on_delete=models.CASCADE)
     requirement = models.CharField(max_length=255)
@@ -167,9 +168,6 @@ class ChangeRequest(models.Model):
     class Meta:
         ordering = ['-date_created']
 
-
-from django.core.exceptions import ValidationError
-from django.db import models
 
 class IssueComment(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
@@ -234,6 +232,7 @@ class Conversation(models.Model):
     class Meta:
         ordering = ['-date_created']
 
+
 class ConversationMessage(models.Model):
     conversation = models.ForeignKey(Conversation,on_delete=models.CASCADE,related_name="messages")
     sent_by = models.ForeignKey(Account,on_delete=models.CASCADE)
@@ -241,12 +240,11 @@ class ConversationMessage(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
     is_read = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.message
+    
 
     class Meta:
         ordering = ['-date_created']
+
 
 class ConversationAttachment(models.Model):
     description = models.TextField()

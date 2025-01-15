@@ -12,6 +12,7 @@ class RecursiveCommentSerializer(serializers.Serializer):
         serializer = IssueCommentSerializer(instance, context=self.context)
         return serializer.data
 
+
 class IssueCommentSerializer(ModelSerializer):
     children = RecursiveCommentSerializer(many=True, read_only=True)
     
@@ -101,7 +102,6 @@ class OrganizationSerializer(serializers.ModelSerializer):
     def get_projects(self, obj):
         projects = obj.project_set.all()
         return ProjectSerializer(projects, many=True).data 
-
 
 
 class ProjectHistorySerializer(ModelSerializer):
@@ -276,3 +276,9 @@ class ConversationSerializer(serializers.ModelSerializer):
         unread_messages = obj.messages.filter(is_read=False).exclude(sent_by=current_user)
         return unread_messages.count()
 
+
+class AccountOrganizationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AccountOrganization
+        fields = '__all__'

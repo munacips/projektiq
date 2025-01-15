@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage
-from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer
+from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization
+from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer
 from django.utils.timezone import now, timedelta
 from django.db.models import Q, Count
 from django.http import JsonResponse
@@ -94,6 +94,23 @@ def project(request,id):
         serializer = ProjectSerializer(project,data=request.data)
         if serializer.is_valid():
             return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
+def issues(request):
+    if request.method == "GET":
+        issues = Issue.objects.all()
+        serializer = IssueSerializer(issues,many=True)
+        return Response(serializer.data)
+    elif request.method == "POST":
+        serializer = IssueSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        print("Error : ",serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
@@ -215,6 +232,23 @@ def organization_change_requests(request,id):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
+def change_requests(request):
+    if request.method == "GET":
+        change_requests = ChangeRequest.objects.all()
+        serializer = ChangeRequestSerializer(change_requests,many=True)
+        return Response(serializer.data)
+    elif request.method == "POST":
+        serializer = ChangeRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        print("Data : ",request.data)
+        print("Error : ",serializer.errors)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET','PUT'])
@@ -372,6 +406,8 @@ def user_project_summary(request):
     except Account.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    total_tasks = ProjectTask.objects.filter(assigned_to=account,implemented=False).count()
+
     # Overdue tasks count
     overdue_tasks_count = ProjectTask.objects.filter(
         assigned_to=account,
@@ -427,6 +463,7 @@ def user_project_summary(request):
         'overdue_tasks_count': overdue_tasks_count,
         'upcoming_tasks_count': upcoming_tasks_count,
         'total_projects': total_projects,
+        'total_tasks' : total_tasks,
         'projects_by_status': projects_status,
         'issues_count': issues_count,
         'overdue_issues_count': overdue_issues_count,
@@ -490,22 +527,24 @@ def my_schedule(request):
     except Account.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if request.method == 'GET':
-        todos = ToDo.objects.filter(account=account)
-        serializer = ToDoSerializer(todos,many=True)
+        tasks = ProjectTask.objects.filter(assigned_to=account)
+        serializer = ProjectTaskSerializer(tasks,many=True)
         return Response(serializer.data)
     elif request.method == 'POST':
-        data = request.data
-        todo = ToDo(description=data['description'],date_start=data['date_start'],date_end=data['date_end'])
-        todo.save()
-        serializer = ToDoSerializer(todo)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # data = request.data
+        # todo = ToDo(description=data['description'],date_start=data['date_start'],date_end=data['date_end'])
+        # todo.save()
+        # serializer = ToDoSerializer(todo)
+        # return Response(serializer.data, status=status.HTTP_201_CREATED)
+        pass
     elif request.method == 'PUT':
-        data = request.data
-        todo = ToDo.objects.get(id=data['id'])
-        todo.completed = True
-        todo.save()
-        serializer = ToDoSerializer(todo)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # data = request.data
+        # todo = ToDo.objects.get(id=data['id'])
+        # todo.completed = True
+        # todo.save()
+        # serializer = ToDoSerializer(todo)
+        # return Response(serializer.data, status=status.HTTP_200_OK)
+        pass
 
 
 @api_view(['GET', 'POST'])
@@ -554,7 +593,7 @@ def send_message(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET', 'PATCH'])  # Adding 'GET' for possible testing/debugging
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def mark_messages_as_read(request,id):
     try:
@@ -596,3 +635,67 @@ def mark_messages_as_read(request,id):
                 {"message": f"{updated_count} messages marked as read."},
                 status=status.HTTP_200_OK,
             )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_member_to_organization(request):
+    try:
+        org_id = request.data.get('org_id')
+        user_id = request.data.get('user_id')
+        role = request.data.get('role')
+        
+        # First check if organization and account exist
+        organization = Organization.objects.get(id=org_id)
+        account = Account.objects.get(id=user_id)
+        
+        # Check if the membership already exists
+        existing_membership = AccountOrganization.objects.filter(
+            organization=organization,
+            account=account
+        ).exists()
+        
+        if existing_membership:
+            return Response(
+                {"detail": "User is already a member of this organization"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # If no existing membership, create new one
+        AccountOrganization.objects.create(
+            organization=organization,
+            account=account,
+            role=role
+        )
+        
+        return Response(
+            {"detail": "Member added successfully"},
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Organization.DoesNotExist:
+        return Response(
+            {"detail": "Organization not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_users(request):
+    query = request.GET.get('query', '')
+    if not query:
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+    users = Account.objects.filter(username__icontains=query)
+    serializer = AccountSerializer(users, many=True)
+    return Response(serializer.data)
+    

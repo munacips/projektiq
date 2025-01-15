@@ -11,7 +11,9 @@ urlpatterns = [
     path('organizations/<int:id>', views.organization,name='organization'),
     path('organizations/<int:id>/issues/', views.organization_issues,name='organization_issues'),
     path('organizations/<int:id>/change_requests/', views.organization_change_requests,name='organization_change_requests'),
+    path('add_member_to_organization/',views.add_member_to_organization,name="add_member_to_organization"),
 
+    path('issues/',views.issues,name='issues'),
     path('issues/<int:id>', views.issue,name='issue'),
     path('post_issue/<int:id>',views.post_issue_comment,name="post_issue"),
     path('get_issue_comments/<int:id>',views.get_issue_comments,name="get_issue_comments"),
@@ -22,6 +24,7 @@ urlpatterns = [
     path('projects/<int:id>/change_requests/', views.project_change_requests,name='project_change_requests'),
 
     path('change_request/<int:id>',views.change_request,name='change_request'),
+    path('change_requests/',views.change_requests,name='change_requests'),
 
     path('my_projects/', views.my_projects,name='my_projects'),
     path('my_organizations/', views.my_organizations,name='my_organizations'),
@@ -37,6 +40,7 @@ urlpatterns = [
     path('test/',views.check_authentication,name='test'),
 
     path('search/',views.search,name='search'),
+    path('search_users/',views.search_users,name='search_users'),
 
     path('messages/<int:id>/',views.mark_messages_as_read,name='message'),
 ]
