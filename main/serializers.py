@@ -86,22 +86,21 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.manager.username
 
 
-class AccountSerializer(ModelSerializer):
-    class Meta:
-        model = Account
-        fields = '__all__'
-
-
 class OrganizationSerializer(serializers.ModelSerializer):
     projects = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'rating', 'active_projects', 'total_members', 'projects']
+        fields = ['id', 'name', 'rating', 'active_projects', 'total_members', 'projects','members']
 
     def get_projects(self, obj):
         projects = obj.project_set.all()
-        return ProjectSerializer(projects, many=True).data 
+        return ProjectSerializer(projects, many=True).data
+
+    def get_members(self, obj):
+            account_organizations = AccountOrganization.objects.filter(organization=obj)
+            return AccountOrganizationSerializer(account_organizations, many=True).data
 
 
 class ProjectHistorySerializer(ModelSerializer):
@@ -278,7 +277,9 @@ class ConversationSerializer(serializers.ModelSerializer):
 
 
 class AccountOrganizationSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='account.username', read_only=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
 
     class Meta:
         model = AccountOrganization
-        fields = '__all__'
+        fields = ['id','username', 'organization_name', 'role', 'date_created', 'date_updated','account','organization','approved','admin_approved']

@@ -23,6 +23,7 @@ ROLES = [
         ('Developer', 'Developer'),
         ('Tester', 'Tester'),
         ('Maintainer', 'Maintainer'),
+        ('Member', 'Member'),
 ]
 
 class Account(AbstractUser):
@@ -42,6 +43,12 @@ class Organization(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.active_projects = Project.objects.filter(organizations=self).count()
+        self.total_members = AccountOrganization.objects.filter(organization=self).count()
+        super().save(*args, **kwargs)
 
 
 class AccountOrganization(models.Model):
@@ -50,6 +57,8 @@ class AccountOrganization(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
     role = models.CharField(max_length=100, choices=ROLES, default='Member')
+    approved = models.BooleanField(default=False)
+    admin_approved = models.BooleanField(default=False)
 
     def __str__(self):
         return self.organization.name + ' : ' + self.account.username

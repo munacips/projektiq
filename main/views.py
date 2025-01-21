@@ -689,6 +689,54 @@ def add_member_to_organization(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_member_from_organization(request):
+    try:
+        org_id = request.data.get('org_id')
+        user_id = request.data.get('user_id')
+
+        # First check if organization and account exist
+        organization = Organization.objects.get(id=org_id)
+        account = Account.objects.get(id=user_id)
+        # Check if the membership exists
+        existing_membership = AccountOrganization.objects.filter(
+            organization=organization,
+            account=account
+        ).exists()
+        if not existing_membership:
+            return Response(
+                {"detail": "User is not a member of this organization"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+
+        # If membership exists, delete it
+        AccountOrganization.objects.filter(
+            organization=organization,
+            account=account
+        ).delete()
+
+        return Response(
+            {"detail": "Member removed successfully"},
+            status=status.HTTP_200_OK
+        )
+    except Organization.DoesNotExist:
+        return Response(
+            {"detail": "Organization not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_users(request):
