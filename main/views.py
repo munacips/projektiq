@@ -698,24 +698,9 @@ def remove_member_from_organization(request):
 
         # First check if organization and account exist
         organization = Organization.objects.get(id=org_id)
-        account = Account.objects.get(id=user_id)
-        # Check if the membership exists
-        existing_membership = AccountOrganization.objects.filter(
-            organization=organization,
-            account=account
-        ).exists()
-        if not existing_membership:
-            return Response(
-                {"detail": "User is not a member of this organization"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
+        account_org = AccountOrganization.objects.get(id=user_id)
 
-        # If membership exists, delete it
-        AccountOrganization.objects.filter(
-            organization=organization,
-            account=account
-        ).delete()
+        account_org.delete()
 
         return Response(
             {"detail": "Member removed successfully"},
@@ -747,3 +732,39 @@ def search_users(request):
     serializer = AccountSerializer(users, many=True)
     return Response(serializer.data)
     
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_member_role(request):
+    try:
+        org_id = request.data.get('org_id')
+        user_id = request.data.get('user_id')
+        role = request.data.get('role')
+
+        # First check if organization and account exist
+        print(f"User ID: {user_id}, Type: {type(user_id)}")
+        print(f"Accounts in DB: {list(Account.objects.values_list('id', flat=True))}")
+        organization = Organization.objects.get(id=org_id)
+        acc_org = AccountOrganization.objects.get(id=user_id)
+
+        acc_org.role = role
+        acc_org.save()
+
+        return Response(
+            {"detail": "Member role updated successfully"},
+            status=status.HTTP_200_OK
+        )
+    except Organization.DoesNotExist:
+        return Response(
+            {"detail": "Organization not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )

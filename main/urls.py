@@ -13,6 +13,7 @@ urlpatterns = [
     path('organizations/<int:id>/change_requests/', views.organization_change_requests,name='organization_change_requests'),
     path('add_member_to_organization/',views.add_member_to_organization,name="add_member_to_organization"),
     path('remove_member_from_organization/',views.remove_member_from_organization,name="remove_member_from_organization"), 
+    path('update_member_role/',views.update_member_role,name="update_member_role"),
 
     path('issues/',views.issues,name='issues'),
     path('issues/<int:id>', views.issue,name='issue'),
