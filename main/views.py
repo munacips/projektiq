@@ -768,3 +768,131 @@ def update_member_role(request):
             {"detail": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_org_users(request):
+    query = request.GET.get('query', '').strip()
+    username = request.GET.get('username', '').strip()
+    if not username:
+        return Response({"detail": "Username is required"}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        account = Account.objects.get(username=username)
+        org_ids = AccountOrganization.objects.filter(account=account).values_list("organization_id", flat=True)
+        users = Account.objects.filter(
+            id__in=AccountOrganization.objects.filter(organization_id__in=org_ids).values_list("account_id", flat=True)
+        )
+        if query:
+            users = users.filter(username__icontains=query)
+        serializer = AccountSerializer(users, many=True)
+        return Response(serializer.data)
+    except Account.DoesNotExist:
+        return Response({"detail": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_member_to_project(requst):
+    try:
+        project_id = requst.data.get('project_id')
+        user_id = requst.data.get('user_id')
+        role = requst.data.get('role')
+        project = Project.objects.get(id=project_id)
+        user = Account.objects.get(id=user_id)
+        
+        #chekck if AccountProject exists
+        account_project = AccountProject.objects.filter(project=project, account=user).exists()
+        if account_project:
+            return Response(
+                {"detail": "User is already a member of this project"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        AccountProject.objects.create(project=project, account=user, role=role)
+        return Response(
+            {"detail": "User added to project successfully"},
+            status=status.HTTP_201_CREATED
+        )
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_project_member_role(request):
+    try:
+        project_id = request.data.get('project_id')
+        user_id = request.data.get('user_id')
+        role = request.data.get('role')
+
+        project = Project.objects.get(id=project_id)
+        user = Account.objects.get(id=user_id)
+
+        account_project = AccountProject.objects.get(project=project, account=user)
+        account_project.role = role
+        account_project.save()
+        return Response(
+            {"detail": "User role updated successfully"},
+            status=status.HTTP_200_OK
+        )
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_member_from_project(request):
+    try:
+        project_id = request.data.get('project_id')
+        user_id = request.data.get('user_id')
+        project = Project.objects.get(id=project_id)
+        user = Account.objects.get(id=user_id)
+        account_project = AccountProject.objects.get(project=project, account=user)
+        account_project.delete()
+        return Response(
+            {"detail": "User removed from project successfully"},
+            status=status.HTTP_200_OK
+        )
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

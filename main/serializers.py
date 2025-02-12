@@ -73,17 +73,24 @@ class ProjectSerializer(serializers.ModelSerializer):
     requirements = ProjectRequirementSerializer(many=True, read_only=True, source="projectrequirement_set")
     change_requests = ChangeRequestSerializer(many=True, read_only=True, source="changerequest_set")
     project_manager = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ['id', 'name', 'description', 'date_created', 'date_updated', 
-                  'manager', 'status', 'organization_names', 'issues','requirements','change_requests','project_manager','deadline','stage_due_date','organizations','completion_percentage']
+                  'manager', 'status', 'organization_names', 'issues', 'members','requirements','change_requests','project_manager','deadline','stage_due_date','organizations','completion_percentage']
 
     def get_organization_names(self, obj):
         return [org.name for org in obj.organizations.all()]
 
     def get_project_manager(self, obj):
         return obj.manager.username
+
+    def get_members(self,obj):
+        account_projects = AccountProject.objects.filter(project=obj)
+        return AccountProjectSerializer(account_projects,many=True).data
+        # accounts = [account.account for account in account_projects]
+        # return AccountSerializer(accounts, many=True).data
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -125,11 +132,14 @@ class AccountProjectSerializer(serializers.ModelSerializer):
     project_manager = serializers.CharField(source='project.manager.username')
     organization_names = serializers.SerializerMethodField()
     active_members = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
+    username = serializers.CharField(source='account.username')
+    account_id = serializers.IntegerField(source='account.id')
 
 
     class Meta:
         model = AccountProject
-        fields = ['id','project_name', 'project_description', 'project_status', 'organization_names', 'role', 'date_created', 'date_updated', 'project_deadline', 'completion_percentage', 'project_manager','active_members']
+        fields = ['username','account_id','id','project_name', 'date_created', 'project_description', 'members', 'project_status', 'organization_names', 'role', 'date_created', 'date_updated', 'project_deadline', 'completion_percentage', 'project_manager','active_members']
 
     def get_active_members(self, obj):
         # Count all AccountProject objects associated with the same project
@@ -137,6 +147,10 @@ class AccountProjectSerializer(serializers.ModelSerializer):
 
     def get_organization_names(self, obj):
         return [org.name for org in obj.project.organizations.all()]
+
+    def get_members(self, obj):
+            account_organizations = AccountOrganization.objects.filter(organization=obj.project.organizations.first())
+            return AccountOrganizationSerializer(account_organizations, many=True).data
 
 
 class AccountOrganizationSerializer(serializers.ModelSerializer):

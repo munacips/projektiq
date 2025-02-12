@@ -24,6 +24,9 @@ urlpatterns = [
     path('projects/<int:id>/requirements/', views.project_requirements,name='project_requirements'),
     path('project/<int:id>/requirements/', views.project_requirement,name='project_requirement'),
     path('projects/<int:id>/change_requests/', views.project_change_requests,name='project_change_requests'),
+    path('add_member_to_project/',views.add_member_to_project,name="add_member_to_project"),
+    path('update_project_member_role/',views.update_project_member_role,name="update_project_member_role"),
+    path('remove_member_from_project/',views.remove_member_from_project,name="remove_member_from_project"),
 
     path('change_request/<int:id>',views.change_request,name='change_request'),
     path('change_requests/',views.change_requests,name='change_requests'),
@@ -43,6 +46,7 @@ urlpatterns = [
 
     path('search/',views.search,name='search'),
     path('search_users/',views.search_users,name='search_users'),
+    path('search_org_users/',views.search_org_users,name='search_org_users'),
 
     path('messages/<int:id>/',views.mark_messages_as_read,name='message'),
 ]
