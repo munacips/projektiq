@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
-from .models import Account, Project, Organization, Issue, ProjectRequirement, ChangeRequest, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, ConversationAttachment
+from .models import Account, Project, Organization, Issue, ProjectRequirement, ChangeRequest, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, ConversationAttachment, ChangeRequestComment, TimeLog
 
 class AccountAdmin(admin.ModelAdmin):
     search_fields = ['email']
@@ -11,4 +11,4 @@ class AccountAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 admin.site.register(Account, AccountAdmin)
-admin.site.register([Project, Organization, Issue, ProjectRequirement, ChangeRequest, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, ConversationAttachment])
+admin.site.register([Project,ChangeRequestComment, Organization, Issue, ProjectRequirement, ChangeRequest, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, ConversationAttachment, TimeLog])

@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization
-from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer
+from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization, TimeLog
+from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer, TimeLogSerializer
 from django.utils.timezone import now, timedelta
 from django.db.models import Q, Count
 from django.http import JsonResponse
@@ -181,7 +181,7 @@ def project_requirements(request,id):
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
 
-@api_view(['GET','PUT'])
+@api_view(['GET','PUT','PATCH'])
 @permission_classes([IsAuthenticated])
 def project_requirement(request,id):
     try:
@@ -195,6 +195,11 @@ def project_requirement(request,id):
         serializer = ProjectRequirementSerializer(project_requirement,data=request.data)
         if serializer.is_valid():
             serializer.save()
+    elif request.method == "PATCH":
+        serializer = ProjectRequirementSerializer(project_requirement,data=request.data,partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
@@ -372,7 +377,7 @@ def my_tasks(request):
         return Response(serializer.data)
     elif request.method == 'POST':
         data = request.data
-        task = ProjectTask(task=data['task'], description=data['description'], assigned_to=account)
+        task = ProjectTask(task=data['task'], description=data['description'], assigned_to=account, due_date=data['due_date'])
         task.save()
         serializer = ProjectTaskSerializer(task)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -896,3 +901,132 @@ def remove_member_from_project(request):
             {"detail": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET','POST'])
+#@permission_classes([IsAuthenticated])
+def get_project_timelogs(request,id):
+    try:
+        if request.method == 'GET':
+            project= Project.objects.get(id=id)
+            project_tasks = ProjectTask.objects.filter(project=project)
+            timelogs = TimeLog.objects.filter(task__in=project_tasks)
+            timelogs |= TimeLog.objects.filter(project=project)
+            serializer = TimeLogSerializer(timelogs, many=True)
+            return Response(serializer.data)
+        elif request.method == 'POST':
+            serializer = TimeLogSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
+def get_organization_timelogs(request,id):
+    try:
+        if request.method == 'GET':
+            organization= Organization.objects.get(id=id)
+            organization_projects = Project.objects.filter(organization=organization)
+            project_tasks = ProjectTask.objects.filter(project__in=organization_projects)
+            timelogs = TimeLog.objects.filter(task__in=project_tasks)
+            timelogs |= TimeLog.objects.filter(project__in=organization_projects)
+            serializer = TimeLogSerializer(timelogs, many=True)
+            return Response(serializer.data)
+        elif request.method == 'POST':
+            serializer = TimeLogSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Organization.DoesNotExist:
+        return Response(
+            {"detail": "Organization not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET','POST'])
+#@permission_classes([IsAuthenticated])
+def get_account_timelogs(request,id):
+    try:
+        if request.method == 'GET':
+            account = Account.objects.get(id=id)
+            projects = Project.objects.filter(id__in=AccountProject.objects.filter(account=account).values_list('project', flat=True))
+            project_tasks = ProjectTask.objects.filter(project__in=projects)
+            timelogs = TimeLog.objects.filter(task__in=project_tasks)
+            project_timelogs = TimeLog.objects.filter(project__in=projects)
+            timelogs = timelogs | project_timelogs
+            serializer = TimeLogSerializer(timelogs, many=True)
+            return Response(serializer.data)
+        elif request.method == 'POST':
+            serializer = TimeLogSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET','PATCH'])
+@permission_classes([IsAuthenticated])
+def get_timelog(request,id):
+    try:
+        timelog = TimeLog.objects.get(id=id)
+        if request.method == 'GET':
+            serializer = TimeLogSerializer(timelog)
+            return Response(serializer.data)
+        elif request.method == 'PATCH':
+            serializer = TimeLogSerializer(timelog, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except TimeLog.DoesNotExist:
+        return Response(
+            {"detail": "TimeLog not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def timelogs(request):
+    if request.method == 'POST':
+        account_id = request.user.id
+        data = request.data.copy()
+        data['account'] = account_id
+        serializer = TimeLogSerializer(data=data)
+        print("Data : ",request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

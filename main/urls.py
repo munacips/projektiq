@@ -49,6 +49,12 @@ urlpatterns = [
     path('search_org_users/',views.search_org_users,name='search_org_users'),
 
     path('messages/<int:id>/',views.mark_messages_as_read,name='message'),
+
+    path('get_project_timelogs/<int:id>/',views.get_project_timelogs,name="get_project_timelogs"),
+    path('get_account_timelogs/<int:id>/',views.get_account_timelogs,name="get_account_timelogs"),
+    path('get_organization_timelogs/<int:id>/',views.get_organization_timelogs,name="get_organization_timelogs"),
+    path('get_timelogs/<int:id>/',views.get_timelog,name="get_timelog"),
+    path('timelogs/',views.timelogs,name="timelogs"),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)

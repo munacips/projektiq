@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
-from django.db import models
 
 
 STATUS_CHOICES = [
@@ -196,7 +195,6 @@ class IssueComment(models.Model):
             raise ValidationError("Parent must be null when an issue is set.")
 
     def save(self, *args, **kwargs):
-        # Call clean before saving to ensure validations are applied
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -269,3 +267,42 @@ class ConversationAttachment(models.Model):
 
     class Meta:
         ordering = ['-date_created']
+
+class ChangeRequestComment(models.Model):
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
+    change_request = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(Account, on_delete=models.CASCADE)
+    comment = models.TextField()
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        # Ensure that change_request is null if parent is not null
+        if self.parent and self.change_request is not None:
+            raise ValidationError("Change request must be null when a parent is set.")
+        
+        # Ensure that parent is null if change_request is not null
+        if self.change_request and self.parent is not None:
+            raise ValidationError("Parent must be null when a change request is set.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.comment
+
+    class Meta:
+        ordering = ['-date_created']
+
+
+class TimeLog(models.Model):
+    project = models.ForeignKey(Project,on_delete=models.CASCADE)
+    task = models.ForeignKey(ProjectTask,on_delete=models.CASCADE,null=True,blank=True)
+    account = models.ForeignKey(Account,on_delete=models.CASCADE)
+    description = models.TextField()
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    billable = models.BooleanField(default=False)
