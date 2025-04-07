@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Project, Account, Organization, Issue, ProjectRequirement,ChangeRequest, ProjectHistory, Account, IssueComment, AccountProject, AccountOrganization, ProjectTask, ToDo, Conversation, ConversationAttachment, ConversationMessage, ChangeRequestComment, TimeLog
+from .models import Project, Account, Organization, Issue, ProjectRequirement,ChangeRequest, ProjectHistory, Account, IssueComment, AccountProject, AccountOrganization, ProjectTask, ToDo, Conversation, ConversationAttachment, ConversationMessage, ChangeRequestComment, TimeLog, ProjectComment
 
 
 
@@ -344,3 +344,28 @@ class TimeLogSerializer(serializers.ModelSerializer):
     def get_project_name(self,obj):
         return obj.project.name
 
+class RecursiveProjectCommentSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        serializer = ProjectCommentSerializer(instance, context=self.context)
+        return serializer.data
+
+
+class ProjectCommentSerializer(ModelSerializer):
+    children = RecursiveProjectCommentSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = ProjectComment
+        fields = ['id', 'parent', 'project', 'user', 'comment', 
+                 'date_created', 'date_updated', 'children']
+        depth = 1
+
+    def to_representation(self, instance):
+        # Get the default representation
+        representation = super().to_representation(instance)
+        
+        # Only include children if they exist
+        children = instance.projectcomment_set.all()
+        if not children:
+            representation.pop('children', None)
+            
+        return representation

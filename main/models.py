@@ -93,6 +93,15 @@ class Project(models.Model):
         ordering = ['-date_created']
 
 
+class ProjectComment(models.Model):
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    user = models.ForeignKey(Account, on_delete=models.CASCADE)
+    comment = models.TextField()
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
+
+
 class ProjectTask(models.Model):
     project = models.ForeignKey(Project,on_delete=models.CASCADE,null=True,blank=True)
     task = models.CharField(max_length=255)
@@ -227,17 +236,36 @@ class ToDo(models.Model):
 
 
 class Conversation(models.Model):
-    description = models.TextField()
-    subject = models.CharField(max_length=255)
-    participants = models.ManyToManyField(Account,blank=True)
+    description = models.TextField(blank=True,null=True)
+    subject = models.CharField(max_length=255,blank=True,null=True)
+    participants = models.ManyToManyField(Account, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.subject
 
+    def clean(self):
+        super().clean()
+        # We can only validate this after the instance is saved and participants are added
+        # So this validation will be called in a custom save method for the M2M relationship
+
+    def save(self, *args, **kwargs):
+        # First save the model to get an ID if it's new
+        super().save(*args, **kwargs)
+        
     class Meta:
         ordering = ['-date_created']
+        # We can't add constraints here directly since we need to check after M2M is populated
+
+
+# Create a custom through model for the M2M relationship
+class ConversationParticipant(models.Model):
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    
+    class Meta:
+        unique_together = ('conversation', 'account')
 
 
 class ConversationMessage(models.Model):
@@ -306,3 +334,37 @@ class TimeLog(models.Model):
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     billable = models.BooleanField(default=False)
+
+
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
+from django.core.exceptions import ValidationError
+
+@receiver(m2m_changed, sender=Conversation.participants.through)
+def validate_unique_two_person_conversation(sender, instance, action, **kwargs):
+    if action == 'post_add':
+        participants = instance.participants.all()
+        participant_count = participants.count()
+        
+        # Only apply the constraint for exactly 2 participants
+        if participant_count == 2:
+            participant_ids = sorted(participants.values_list('id', flat=True))
+            
+            # Check if there's another conversation with these exact 2 participants
+            duplicate_conversations = Conversation.objects.filter(
+                participants__in=participant_ids
+            ).annotate(
+                participant_count=models.Count('participants')
+            ).filter(
+                participant_count=2
+            ).exclude(
+                id=instance.id
+            )
+            
+            # For each potential duplicate, check if it has exactly these two participants
+            for conv in duplicate_conversations:
+                conv_participant_ids = sorted(conv.participants.values_list('id', flat=True))
+                if conv_participant_ids == participant_ids:
+                    raise ValidationError(
+                        "A conversation between these two participants already exists."
+                    )

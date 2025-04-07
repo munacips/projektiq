@@ -55,6 +55,14 @@ urlpatterns = [
     path('get_organization_timelogs/<int:id>/',views.get_organization_timelogs,name="get_organization_timelogs"),
     path('get_timelogs/<int:id>/',views.get_timelog,name="get_timelog"),
     path('timelogs/',views.timelogs,name="timelogs"),
+
+    path('create_conversation/',views.create_conversation,name="create_conversation"),
+
+    path('userid/',views.get_user_id,name="get_user_id"),
+
+    path('post_project_comment/<int:id>/', views.post_project_comment, name="post_project_comment"),
+    path('get_project_comments/<int:id>/', views.get_project_comments, name="get_project_comments"),
+    path('manage_project_comment/<int:id>/', views.manage_project_comment, name="manage_project_comment"),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)

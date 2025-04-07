@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization, TimeLog
-from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer, TimeLogSerializer
+from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization, TimeLog, ProjectComment
+from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer, TimeLogSerializer, ProjectCommentSerializer
 from django.utils.timezone import now, timedelta
 from django.db.models import Q, Count
 from django.http import JsonResponse
@@ -1030,3 +1030,90 @@ def timelogs(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_conversation(request):
+    if request.method == 'POST':
+        # Pass the request context to the serializer
+        serializer = ConversationSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_user_id(request):
+    if request.method == 'POST':
+        username = request.data.get('username')
+        try:
+            user = Account.objects.get(username=username)
+            return Response({'id': user.id}, status=status.HTTP_200_OK)
+        except Account.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def post_project_comment(request, id):
+    if request.method == "POST":
+        try:
+            account = Account.objects.get(id=request.user.id)
+        except Account.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            project = Project.objects.get(id=id)
+        except Project.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        data = request.data
+        comment = ProjectComment(project=project, user=account, comment=data['comment'])
+        
+        # Handle parent comment if provided
+        if 'parent' in data and data['parent']:
+            try:
+                parent_comment = ProjectComment.objects.get(id=data['parent'])
+                comment.parent = parent_comment
+            except ProjectComment.DoesNotExist:
+                return Response({"error": "Parent comment not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        comment.save()
+        serializer = ProjectCommentSerializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_project_comments(request, id):
+    try:
+        project = Project.objects.get(id=id)
+    except Project.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    # Get only top-level comments (those without parents)
+    comments = ProjectComment.objects.filter(project=project, parent=None)
+    serializer = ProjectCommentSerializer(comments, many=True)
+    return Response(serializer.data)
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def manage_project_comment(request, id):
+    try:
+        comment = ProjectComment.objects.get(id=id)
+    except ProjectComment.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user is the owner of the comment
+    if comment.user.id != request.user.id:
+        return Response({"error": "You don't have permission to modify this comment"}, 
+                        status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == "PUT":
+        data = request.data
+        comment.comment = data.get('comment', comment.comment)
+        comment.save()
+        serializer = ProjectCommentSerializer(comment)
+        return Response(serializer.data)
+    
+    elif request.method == "DELETE":
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
