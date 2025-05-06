@@ -165,11 +165,6 @@ OAUTH2_PROVIDER = {
     'ALLOW_CLIENT_CREDENTIALS_GRANT': True,
 }
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173'
-]
-
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = False

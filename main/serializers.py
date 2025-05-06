@@ -151,23 +151,35 @@ class AccountOrganizationSerializer(serializers.ModelSerializer):
 
 
 class ProjectTaskSerializer(serializers.ModelSerializer):
-    assigned_to = serializers.CharField(source='assigned_to.username', read_only=True)
-    assigned_by = serializers.CharField(source='assigned_by.username', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
+    assigned_by_name = serializers.CharField(source='assigned_by.username', read_only=True)
+    project_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectTask
         fields = [
             'id',
             'task',
+            'project',
+            'project_name',
             'description',
             'date_created',
             'date_updated',
             'due_date',
             'implemented',
+            'hours_needed',
             'assigned_to',
-            'assigned_by'
+            'assigned_by',
+            'hours_needed',
+            'assigned_to_name',
+            'assigned_by_name',
+            'priority'
         ]
 
+    def get_project_name(self, obj):
+        if obj.project:
+            return obj.project.name
+        return ""
 
 class ToDoSerializer(serializers.ModelSerializer):
     issue_name = serializers.SerializerMethodField()
@@ -334,15 +346,21 @@ class ProjectSerializer(serializers.ModelSerializer):
 class TimeLogSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
+    task_name = serializers.SerializerMethodField()
     class Meta:
         model = TimeLog
-        fields = ['id','project','task','account','start_time', 'project_name','username','end_time','date_created','date_updated','description']
+        fields = ['id','project','task', 'task_name', 'account','start_time', 'project_name', 'hours_spent','username','end_time','date_created','date_updated','description']
 
     def get_username(self,obj):
         return obj.account.username
 
     def get_project_name(self,obj):
         return obj.project.name
+    
+    def get_task_name(self,obj):
+        if obj.task:
+            return obj.task.task
+        return ""
 
 class RecursiveProjectCommentSerializer(serializers.Serializer):
     def to_representation(self, instance):
@@ -369,3 +387,13 @@ class ProjectCommentSerializer(ModelSerializer):
             representation.pop('children', None)
             
         return representation
+    
+
+class ProjectHistorySerializer(serializers.ModelSerializer):
+    project_name = serializers.SerializerMethodField()
+    class Meta:
+        model = ProjectHistory
+        fields = ['id','project','project_name','date_created','date_updated','description','date_ended','status']
+
+    def get_project_name(self,obj):
+        return obj.project.name

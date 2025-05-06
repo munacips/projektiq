@@ -25,6 +25,13 @@ ROLES = [
         ('Member', 'Member'),
 ]
 
+PRIORITIES = [
+    ('low','Low'),
+    ('medium', 'Medium'),
+    ('high','High'),
+    ('very high', 'Very High')
+]
+
 class Account(AbstractUser):
 
     phone_number = models.IntegerField(null=True, blank=True)
@@ -110,8 +117,10 @@ class ProjectTask(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     due_date = models.DateTimeField()
     implemented = models.BooleanField(default=False)
-    assigned_to = models.ForeignKey(Account,on_delete=models.CASCADE,null=True,blank=True,related_name='assigned_to')
-    assigned_by = models.ForeignKey(Account,on_delete=models.CASCADE,null=True,blank=True,related_name='assigned_by')
+    hours_needed = models.IntegerField(null=True, blank=True)
+    priority = models.CharField(max_length=255,null=True,blank=True,choices=PRIORITIES,default='Medium')
+    assigned_to = models.ForeignKey(Account,on_delete=models.CASCADE,null=True,blank=True,related_name='tasks_assigned_to')
+    assigned_by = models.ForeignKey(Account,on_delete=models.CASCADE,null=True,blank=True,related_name='tasks_assigned_by')
 
     def __str__(self):
         return self.task
@@ -333,7 +342,15 @@ class TimeLog(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
+    hours_spent = models.IntegerField(null=True, blank=True)
     billable = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.start_time and self.end_time:
+            time_diff = self.end_time - self.start_time
+            self.hours_spent = round(time_diff.total_seconds() / 3600)
+        
+        super().save(*args, **kwargs)
 
 
 from django.db.models.signals import m2m_changed

@@ -880,10 +880,16 @@ def remove_member_from_project(request):
         user_id = request.data.get('user_id')
         project = Project.objects.get(id=project_id)
         user = Account.objects.get(id=user_id)
+        
+        # First, reassign all tasks assigned to this user in this project to None
+        ProjectTask.objects.filter(project=project, assigned_to=user).update(assigned_to=None)
+        
+        # Then remove the user from the project
         account_project = AccountProject.objects.get(project=project, account=user)
         account_project.delete()
+        
         return Response(
-            {"detail": "User removed from project successfully"},
+            {"detail": "User removed from project successfully and their tasks have been unassigned"},
             status=status.HTTP_200_OK
         )
     except Project.DoesNotExist:
@@ -904,7 +910,7 @@ def remove_member_from_project(request):
 
 
 @api_view(['GET','POST'])
-#@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def get_project_timelogs(request,id):
     try:
         if request.method == 'GET':
@@ -938,8 +944,8 @@ def get_project_timelogs(request,id):
 def get_organization_timelogs(request,id):
     try:
         if request.method == 'GET':
-            organization= Organization.objects.get(id=id)
-            organization_projects = Project.objects.filter(organization=organization)
+            organization = Organization.objects.get(id=id)
+            organization_projects = Project.objects.filter(organizations=organization)
             project_tasks = ProjectTask.objects.filter(project__in=organization_projects)
             timelogs = TimeLog.objects.filter(task__in=project_tasks)
             timelogs |= TimeLog.objects.filter(project__in=organization_projects)
@@ -970,8 +976,8 @@ def get_account_timelogs(request,id):
             account = Account.objects.get(id=id)
             projects = Project.objects.filter(id__in=AccountProject.objects.filter(account=account).values_list('project', flat=True))
             project_tasks = ProjectTask.objects.filter(project__in=projects)
-            timelogs = TimeLog.objects.filter(task__in=project_tasks)
-            project_timelogs = TimeLog.objects.filter(project__in=projects)
+            timelogs = TimeLog.objects.filter(task__in=project_tasks,account=account)
+            project_timelogs = TimeLog.objects.filter(project__in=projects,account=account)
             timelogs = timelogs | project_timelogs
             serializer = TimeLogSerializer(timelogs, many=True)
             return Response(serializer.data)
@@ -1117,3 +1123,93 @@ def manage_project_comment(request, id):
     elif request.method == "DELETE":
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_task(request):
+    if request.method == "POST":
+        serializer = ProjectTaskSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_project_members(request,id):
+    try:
+        project = Project.objects.get(id=id)
+    except Project.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'GET':
+        project_accounts = AccountProject.objects.filter(project=project)
+        accounts = Account.objects.filter(id__in=project_accounts.values_list('account', flat=True))
+        serializer = AccountSerializer(accounts, many=True)
+        return Response(serializer.data)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_project_tasks(request, project_id, user_id):
+    try:
+        if request.method == 'GET':
+            project = Project.objects.get(id=project_id)
+            user = Account.objects.get(id=user_id)
+            
+            # Get tasks for this specific project assigned to this specific user
+            tasks = ProjectTask.objects.filter(project=project, assigned_to=user)
+            
+            serializer = ProjectTaskSerializer(tasks, many=True)
+            return Response(serializer.data)
+            
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {"detail": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET','PATCH'])
+@permission_classes([IsAuthenticated])
+def get_task(request, id):
+    try:
+        task = ProjectTask.objects.get(id=id)
+        if request.method == 'GET':
+            serializer = ProjectTaskSerializer(task)
+            return Response(serializer.data)
+        
+        elif request.method == 'PATCH':
+            serializer = ProjectTaskSerializer(task, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = ProjectTaskSerializer(task)
+        return Response(serializer.data)
+    except ProjectTask.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def project_history_list(request, project_id):
+    try:
+        histories = ProjectHistory.objects.filter(project_id=project_id)
+        serializer = ProjectHistorySerializer(histories, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -63,6 +63,14 @@ urlpatterns = [
     path('post_project_comment/<int:id>/', views.post_project_comment, name="post_project_comment"),
     path('get_project_comments/<int:id>/', views.get_project_comments, name="get_project_comments"),
     path('manage_project_comment/<int:id>/', views.manage_project_comment, name="manage_project_comment"),
+
+    path('create_task/',views.create_task,name="create_task"),
+    path('get_project_members/<int:id>/',views.get_project_members,name="get_project_members"),
+    path('user_project_tasks/<int:user_id>/<int:project_id>/', views.get_user_project_tasks, name='get_user_project_tasks'),
+    path('get_task/<int:id>/',views.get_task,name="get_task"),
+    #path('get_project_timelogs/<int:id>/',views.get_project_timelogs)
+
+    path('project_history/<int:project_id>/', views.project_history_list, name='project-history'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)
