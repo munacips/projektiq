@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization, TimeLog, ProjectComment
 from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer, TimeLogSerializer, ProjectCommentSerializer
-from django.utils.timezone import now, timedelta
+from django.utils.timezone import now, timedelta, timezone
 from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -607,8 +607,8 @@ def mark_messages_as_read(request,id):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        messages = Message.objects.filter(account=account)
-        serializer = MessageSerializer(messages, many=True)
+        messages = ConversationMessage.objects.filter(account=account)
+        serializer = ConversationMessageSerializer(messages, many=True)
         return Response(serializer.data)
 
     elif request.method == 'PATCH':
@@ -635,7 +635,7 @@ def mark_messages_as_read(request,id):
             if not message_ids:
                 return Response({"error": "'message_ids' field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            updated_count = Message.objects.filter(id__in=message_ids, account=account).update(is_read=True)
+            updated_count = ConversationMessage.objects.filter(id__in=message_ids, account=account).update(is_read=True)
             return Response(
                 {"message": f"{updated_count} messages marked as read."},
                 status=status.HTTP_200_OK,
@@ -1204,12 +1204,28 @@ def get_task(request, id):
         return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
-@api_view(['GET'])
+@api_view(['GET','PATCH','POST'])
 @permission_classes([IsAuthenticated])
 def project_history_list(request, project_id):
     try:
-        histories = ProjectHistory.objects.filter(project_id=project_id)
-        serializer = ProjectHistorySerializer(histories, many=True)
-        return Response(serializer.data)
+        if request.method == 'GET':
+            histories = ProjectHistory.objects.filter(project_id=project_id)
+            serializer = ProjectHistorySerializer(histories, many=True)
+            return Response(serializer.data)
+        if request.method == 'PATCH':
+            history = ProjectHistory.objects.get(id=request.data['id'])
+            serializer = ProjectHistorySerializer(history, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if request.method == 'POST':
+            serializer = ProjectHistorySerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        

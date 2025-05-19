@@ -128,6 +128,7 @@ class AccountProjectSerializer(serializers.ModelSerializer):
 
 class AccountOrganizationSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source='account.username', read_only=True)
+    account_id = serializers.IntegerField(source='account.id', read_only=True)
     total_members = serializers.IntegerField(source='organization.total_members', read_only=True)
     active_projects = serializers.IntegerField(source='organization.active_projects', read_only=True)
     rating = serializers.IntegerField(source='organization.rating', read_only=True)
@@ -138,6 +139,7 @@ class AccountOrganizationSerializer(serializers.ModelSerializer):
         model = AccountOrganization
         fields = [
             'id',
+            'account_id',
             'total_members',
             'active_projects',
             'rating',
@@ -180,6 +182,7 @@ class ProjectTaskSerializer(serializers.ModelSerializer):
         if obj.project:
             return obj.project.name
         return ""
+
 
 class ToDoSerializer(serializers.ModelSerializer):
     issue_name = serializers.SerializerMethodField()
@@ -320,6 +323,7 @@ class ChangeRequestSerializer(ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     organization_names = serializers.SerializerMethodField()
     issues = IssueSerializer(many=True, read_only=True, source='issue_set')
+    tasks = ProjectTaskSerializer(many=True, read_only=True, source='projecttask_set')
     requirements = ProjectRequirementSerializer(many=True, read_only=True, source="projectrequirement_set")
     change_requests = ChangeRequestSerializer(many=True, read_only=True, source="changerequest_set")
     project_manager = serializers.SerializerMethodField()
@@ -328,7 +332,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ['id', 'name', 'description', 'date_created', 'date_updated', 
-                  'manager', 'status', 'organization_names', 'issues', 'members','requirements','change_requests','project_manager','deadline','stage_due_date','organizations','completion_percentage']
+                  'manager', 'status', 'organization_names', 'tasks', 'issues', 'members','requirements','change_requests','project_manager','deadline','stage_due_date','organizations','completion_percentage']
 
     def get_organization_names(self, obj):
         return [org.name for org in obj.organizations.all()]
@@ -339,8 +343,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_members(self,obj):
         account_projects = AccountProject.objects.filter(project=obj)
         return AccountProjectSerializer(account_projects,many=True).data
-        # accounts = [account.account for account in account_projects]
-        # return AccountSerializer(accounts, many=True).data
 
 
 class TimeLogSerializer(serializers.ModelSerializer):

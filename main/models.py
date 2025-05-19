@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
+import datetime
 
 
 STATUS_CHOICES = [
@@ -139,7 +140,7 @@ class AccountProject(models.Model):
 
 class ProjectHistory(models.Model):
     project = models.ForeignKey(Project,on_delete=models.CASCADE)
-    date_created = models.DateTimeField(auto_now_add=True)
+    date_created = models.DateTimeField(default=datetime.datetime.now())
     date_ended = models.DateTimeField(null=True, blank=True)
     date_updated = models.DateTimeField(auto_now=True)
     description = models.TextField()
