@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
-import datetime
+import random
+import string
 
 
 STATUS_CHOICES = [
@@ -44,6 +45,7 @@ class Account(AbstractUser):
 
 class Organization(models.Model):
     name = models.CharField(max_length=100)
+    code = models.CharField(max_length=8,unique=True)
     rating = models.IntegerField(null=True, blank=True)
     active_projects = models.IntegerField(null=True, blank=True)
     total_members = models.IntegerField(null=True, blank=True)
@@ -51,10 +53,20 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
     
+    def generate_unique_code(self):
+        """Generate a unique code in the format aaaa0000"""
+        while True:
+            letters = ''.join(random.choice(string.ascii_lowercase) for _ in range(4))
+            digits = ''.join(random.choice(string.digits) for _ in range(4))
+            new_code = letters + digits
+            
+            if not Organization.objects.filter(code=new_code).exists():
+                return new_code
+    
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.active_projects = Project.objects.filter(organizations=self).count()
-        self.total_members = AccountOrganization.objects.filter(organization=self).count()
+        if not self.pk or not self.code:
+            self.code = self.generate_unique_code()
+            
         super().save(*args, **kwargs)
 
 
@@ -88,7 +100,7 @@ class Project(models.Model):
 
     def calculate_stage_status(self):
         if not self.stage_due_date:
-            return "Unknown"  # Default for missing due dates
+            return "Unknown" 
         days_left = (self.stage_due_date - now()).days
         if days_left >= 7:
             return "On Track"
@@ -140,7 +152,7 @@ class AccountProject(models.Model):
 
 class ProjectHistory(models.Model):
     project = models.ForeignKey(Project,on_delete=models.CASCADE)
-    date_created = models.DateTimeField(default=datetime.datetime.now())
+    date_created = models.DateTimeField(auto_now_add=True)
     date_ended = models.DateTimeField(null=True, blank=True)
     date_updated = models.DateTimeField(auto_now=True)
     description = models.TextField()
@@ -248,6 +260,7 @@ class ToDo(models.Model):
 class Conversation(models.Model):
     description = models.TextField(blank=True,null=True)
     subject = models.CharField(max_length=255,blank=True,null=True)
+    is_group = models.BooleanField(default=False)
     participants = models.ManyToManyField(Account, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
@@ -269,7 +282,6 @@ class Conversation(models.Model):
         # We can't add constraints here directly since we need to check after M2M is populated
 
 
-# Create a custom through model for the M2M relationship
 class ConversationParticipant(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE)
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
@@ -305,6 +317,7 @@ class ConversationAttachment(models.Model):
 
     class Meta:
         ordering = ['-date_created']
+
 
 class ChangeRequestComment(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True)

@@ -68,9 +68,10 @@ urlpatterns = [
     path('get_project_members/<int:id>/',views.get_project_members,name="get_project_members"),
     path('user_project_tasks/<int:user_id>/<int:project_id>/', views.get_user_project_tasks, name='get_user_project_tasks'),
     path('get_task/<int:id>/',views.get_task,name="get_task"),
-    #path('get_project_timelogs/<int:id>/',views.get_project_timelogs)
 
     path('project_history/<int:project_id>/', views.project_history_list, name='project-history'),
+    path('search_organizations/', views.search_organizations, name='search_organizations'),
+    path('invite_organization_to_project/', views.invite_organization_to_project, name='invite_organization_to_project'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)

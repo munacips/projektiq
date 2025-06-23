@@ -263,6 +263,7 @@ class ConversationSerializer(serializers.ModelSerializer):
             'participants',
             'participants_usernames',
             'messages',
+            'is_group',
             'attachments',
             'unread_messages',
             'date_created',

@@ -52,6 +52,8 @@ def projects(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
 def organizations(request):
@@ -65,6 +67,7 @@ def organizations(request):
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET','PUT'])
 @permission_classes([IsAuthenticated])
 def organization(request,id):
@@ -75,10 +78,16 @@ def organization(request,id):
     if request.method == "GET":
         serializer = OrganizationSerializer(organization)
         return Response(serializer.data)
+    elif request.method == "PATCH":
+        serializer = OrganizationSerializer(organization,data=request.data,partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
     elif request.method == "PUT":
         serializer = OrganizationSerializer(organization,data=request.data)
         if serializer.is_valid():
             return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['GET','PUT'])
 @permission_classes([IsAuthenticated])
@@ -129,6 +138,7 @@ def project_issues(request,id):
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET','PUT'])
 @permission_classes([IsAuthenticated])
 def issue(request,id):
@@ -143,6 +153,7 @@ def issue(request,id):
         serializer = IssueSerializer(issue,data=request.data)
         if serializer.is_valid():            
             return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
@@ -164,6 +175,7 @@ def organization_issues(request,id):
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
 def project_requirements(request,id):
@@ -180,6 +192,7 @@ def project_requirements(request,id):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
+
 
 @api_view(['GET','PUT','PATCH'])
 @permission_classes([IsAuthenticated])
@@ -201,6 +214,7 @@ def project_requirement(request,id):
             serializer.save()
             return Response(serializer.data,status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
 def project_change_requests(request,id):
@@ -217,6 +231,7 @@ def project_change_requests(request,id):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
+
 
 @api_view(['GET','PUT'])
 @permission_classes([IsAuthenticated])
@@ -1228,4 +1243,68 @@ def project_history_list(request, project_id):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_organizations(request):
+    try:
+        query = request.GET.get('query', '')
+        if not query:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        organization = Organization.objects.get(code=query)
+        serializer = OrganizationSerializer(organization)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def invite_organization_to_project(request):
+    try:
+        project_id = request.data.get('project_id')
+        organization_id = request.data.get('organization_id')
+        project = Project.objects.get(id=project_id)
+        organization = Organization.objects.get(id=organization_id)
         
+        # Check if the organization is already linked to the project
+        if project.organizations.filter(id=organization_id).exists():
+            return Response(
+                {"detail": "Organization is already linked to this project"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Link the organization to the project
+        project.organizations.add(organization)
+
+        # Get Organization Admin
+        org_admin = AccountOrganization.objects.filter(organization=organization, role='Admin').first()
+        new_account_project = AccountProject.objects.create(
+            project=project,
+            account=org_admin.account,
+            role='Member'
+        )
+
+        
+        return Response(
+            {"detail": "Organization invited to project successfully"},
+            status=status.HTTP_201_CREATED
+        )
+    except Project.DoesNotExist:
+        return Response(
+            {"detail": "Project not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Organization.DoesNotExist:
+        return Response(
+            {"detail": "Organization not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+    
