@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from .models import Project, Organization, Account, Issue,  ProjectRequirement, ChangeRequest, ProjectHistory, AccountOrganization, AccountProject, IssueComment, ProjectTask, ToDo, Conversation, ConversationMessage, AccountOrganization, TimeLog, ProjectComment
 from .serializers import ProjectSerializer, AccountSerializer, IssueSerializer, ProjectRequirementSerializer, ChangeRequestSerializer, ProjectHistorySerializer, AccountSerializer, AccountProjectSerializer, IssueCommentSerializer, AccountOrganizationSerializer, ProjectTaskSerializer, OrganizationSerializer, ToDoSerializer, ConversationSerializer, ConversationMessageSerializer, AccountOrganizationSerializer, TimeLogSerializer, ProjectCommentSerializer
@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.hashers import make_password
 
 import logging
 
@@ -66,7 +67,26 @@ def organizations(request):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data,status=status.HTTP_201_CREATED)
-
+        
+@api_view(['POST'])
+@csrf_exempt
+@permission_classes([AllowAny])
+def signup(request):
+    if request.method == "POST":
+        data = request.data.copy()
+        data['password'] = make_password(data.get('password', ''))
+        serializer = AccountSerializer(data=data, context={'request': request})
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = serializer.save()
+        
+        response_data = serializer.data
+        response_data.pop('password', None)
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
+   
 
 @api_view(['GET','PUT'])
 @permission_classes([IsAuthenticated])

@@ -72,6 +72,8 @@ urlpatterns = [
     path('project_history/<int:project_id>/', views.project_history_list, name='project-history'),
     path('search_organizations/', views.search_organizations, name='search_organizations'),
     path('invite_organization_to_project/', views.invite_organization_to_project, name='invite_organization_to_project'),
+
+    path('signup/',views.signup,name="signup")
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL , document_root=settings.STATIC_ROOT)
